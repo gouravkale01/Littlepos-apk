@@ -1,26 +1,34 @@
 
-name: Build LittlePOS APK
+name: LittlePOS V2 APK Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
+      - name: Extract V2 ZIP
+        run: |
+          if [ ! -f littlepos-v2-final.zip ]; then
+            echo "V2 ZIP not found in repository root"
+            exit 1
+          fi
+          unzip -o littlepos-v2-final.zip -d .
+          test -f pubspec.yaml || {
+            echo "pubspec.yaml missing after extraction"
+            exit 1
+          }
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -28,134 +36,63 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Extract LittlePOS ZIP
-        shell: bash
-        run: |
-          set -e
+      - name: Generate Android files
+        run: flutter create --platforms=android --project-name kaayansh_boutique_pos .
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: LittlePOS ZIP not found in repository root"
-            exit 1
-          fi
-
-          mkdir -p _source
-          unzip -q "$ZIP_FILE" -d _source
-
-          PUBSPEC=$(find _source -name pubspec.yaml -type f | head -n 1)
-
-          if [ -z "$PUBSPEC" ]; then
-            echo "ERROR: pubspec.yaml not found inside ZIP"
-            exit 1
-          fi
-
-          APP_DIR=$(dirname "$PUBSPEC")
-          cp -a "$APP_DIR"/. .
-
-          if [ ! -f pubspec.yaml ]; then
-            echo "ERROR: Project files were not copied"
-            exit 1
-          fi
-
-      - name: Generate fresh Android project
-        shell: bash
-        run: |
-          set -e
-
-          rm -rf android
-
-          flutter create \
-            --platforms=android \
-            --org com.kaayansh.littlepos \
-            .
-
-      - name: Disable crashing Android release lint tasks
+      - name: Add Android permissions
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
-          groovy = Path("android/build.gradle")
-          kotlin = Path("android/build.gradle.kts")
-
-          if groovy.exists():
-              with groovy.open("a") as f:
-                  f.write("""
-          
-          subprojects {
-              tasks.configureEach {
-                  if (name.startsWith("lintVital")) {
-                      enabled = false
-                  }
-              }
-          }
-          """)
-          elif kotlin.exists():
-              with kotlin.open("a") as f:
-                  f.write("""
-          
-          subprojects {
-              tasks.configureEach {
-                  if (name.startsWith("lintVital")) {
-                      enabled = false
-                  }
-              }
-          }
-          """)
-          else:
-              raise SystemExit("Android root Gradle file not found")
-          PY
-          
-      - name: Configure local network permissions
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
-
           permissions = [
-              "android.permission.INTERNET",
-              "android.permission.ACCESS_NETWORK_STATE",
-              "android.permission.ACCESS_WIFI_STATE",
+              '<uses-permission android:name="android.permission.CAMERA"/>',
+              '<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>',
+              '<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>',
+              '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>',
+              '<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>'
           ]
-
-          for permission in permissions:
-              if permission not in s:
-                  s = s.replace(
-                      "<application",
-                      f'<uses-permission android:name="{permission}" />\n    <application',
-                      1
-                  )
-
-          if "android:usesCleartextTraffic" not in s:
-              s = s.replace(
-                  "<application",
-                  '<application android:usesCleartextTraffic="true"',
-                  1
-              )
-
+          marker = '<application'
+          if marker not in s:
+              raise SystemExit("Android application tag missing")
+          for item in permissions:
+              if item.split('"')[1] not in s:
+                  s = s.replace(marker, '    ' + item + '\n    ' + marker, 1)
           p.write_text(s)
           PY
 
-      - name: Install Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Check Flutter project
-        run: flutter analyze --no-pub
-        continue-on-error: true
+      - name: Disable problematic lintVital tasks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/build.gradle")
+          if not p.exists():
+              p = Path("android/build.gradle.kts")
+          if not p.exists():
+              raise SystemExit("Gradle file not found")
+          p.write_text(p.read_text() + """
+          
+          subprojects {
+              tasks.configureEach {
+                  if (name.startsWith("lintVital")) {
+                      enabled = false
+                  }
+              }
+          }
+          """)
+          PY
 
-      - name: Build release APK
+      - name: Build Release APK
         run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LittlePOS-Android-APK
+          name: LittlePOS-V2-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-          retention-days: 7
           
