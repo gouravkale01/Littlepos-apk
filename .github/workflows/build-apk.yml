@@ -125,26 +125,49 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Configure Android library plugins for SDK 36
+      - name: Set every Flutter plugin compile SDK to 36
         shell: bash
         run: |
-          cat >> android/build.gradle.kts <<'KOTLIN'
-          
-          // Set plugin Android library compile SDK without editing package source files.
-          subprojects {
-              plugins.withId("com.android.library") {
-                  val androidExtension = extensions.findByName("android")
-                      ?: throw GradleException("Android extension missing for $name")
-                  val compileSdkSetter = androidExtension.javaClass.methods.firstOrNull {
-                      (it.name == "setCompileSdk" || it.name == "setCompileSdkVersion") &&
-                          it.parameterCount == 1 &&
-                          (it.parameterTypes[0] == Int::class.javaPrimitiveType ||
-                           it.parameterTypes[0] == Int::class.java)
-                  } ?: throw GradleException("Could not find compileSdk setter for $name")
-                  compileSdkSetter.invoke(androidExtension, 36)
-              }
-          }
-          KOTLIN
+          python3 - <<'PY'
+          from pathlib import Path
+
+          cache = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
+          required = {"file_picker", "flutter_plugin_android_lifecycle"}
+          changed = []
+          found = set()
+
+          for gradle_file in cache.glob("*/android/build.gradle*"):
+              package = gradle_file.parent.parent.name.rsplit("-", 1)[0]
+              if package not in required and "compileSdk" not in gradle_file.read_text(errors="ignore"):
+                  continue
+
+              original = gradle_file.read_text()
+              lines = original.splitlines()
+              updated = []
+              touched = False
+
+              for line in lines:
+                  stripped = line.strip()
+                  if "compileSdk" in stripped and not stripped.startswith("//"):
+                      indent = line[:len(line) - len(line.lstrip())]
+                      if stripped.startswith("compileSdkVersion"):
+                          line = indent + "compileSdkVersion 36"
+                          touched = True
+                      elif stripped.startswith("compileSdk"):
+                          line = indent + "compileSdk = 36"
+                          touched = True
+                  updated.append(line)
+
+              if touched:
+                  gradle_file.write_text("\n".join(updated) + "\n")
+                  changed.append(str(gradle_file))
+                  found.add(package)
+
+          print("Patched Gradle files:", changed)
+          missing = required - found
+          if missing:
+              raise SystemExit("Could not patch required plugin(s): " + ", ".join(sorted(missing)))
+          PY
 
       - name: Build Release APK
         run: flutter build apk --release
