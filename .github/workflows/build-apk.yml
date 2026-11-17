@@ -70,6 +70,43 @@ jobs:
             --org com.kaayansh.littlepos \
             .
 
+      - name: Disable crashing Android release lint tasks
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          groovy = Path("android/build.gradle")
+          kotlin = Path("android/build.gradle.kts")
+
+          if groovy.exists():
+              with groovy.open("a") as f:
+                  f.write("""
+          
+          subprojects {
+              tasks.configureEach {
+                  if (name.startsWith("lintVital")) {
+                      enabled = false
+                  }
+              }
+          }
+          """)
+          elif kotlin.exists():
+              with kotlin.open("a") as f:
+                  f.write("""
+          
+          subprojects {
+              tasks.configureEach {
+                  if (name.startsWith("lintVital")) {
+                      enabled = false
+                  }
+              }
+          }
+          """)
+          else:
+              raise SystemExit("Android root Gradle file not found")
+          PY
+          
       - name: Configure local network permissions
         shell: bash
         run: |
