@@ -1,4 +1,3 @@
-
 name: LittlePOS V2 APK Build
 
 on:
@@ -30,6 +29,33 @@ jobs:
             exit 1
           }
 
+      - name: Fix known Dart compile errors
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("lib/screens/billing_screen.dart")
+          if p.exists():
+              s = p.read_text()
+              s = s.replace(
+                  "bool get _gst=(_company?['gst_registered'] as int? ?? 0)==1;",
+                  "bool get _gst => (_company?['gst_registered'] as int? ?? 0) == 1;"
+              )
+              s = s.replace(
+                  "pw.Padding(padding: const EdgeInsets.all(",
+                  "pw.Padding(padding: const pw.EdgeInsets.all("
+              )
+              p.write_text(s)
+
+          p = Path("lib/screens/dashboard_screen.dart")
+          if p.exists():
+              s = p.read_text().replace(
+                  "pw.Padding(padding: const EdgeInsets.all(",
+                  "pw.Padding(padding: const pw.EdgeInsets.all("
+              )
+              p.write_text(s)
+          PY
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -58,7 +84,7 @@ jobs:
               raise SystemExit("Android application tag missing")
           for item in permissions:
               if item.split('"')[1] not in s:
-                  s = s.replace(marker, '    ' + item + '\n    ' + marker, 1)
+                  s = s.replace(marker, '    ' + item + '\\n    ' + marker, 1)
           p.write_text(s)
           PY
 
@@ -95,4 +121,3 @@ jobs:
           name: LittlePOS-V2-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-          
