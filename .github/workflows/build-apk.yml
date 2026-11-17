@@ -80,6 +80,40 @@ jobs:
           p.write_text(s)
           PY
 
+
+      - name: Fix Android Gradle versions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/settings.gradle")
+          s = p.read_text()
+
+          s, count = re.subn(
+              r'(id\s+["\']com\.android\.application["\']\s+version\s+["\'])[^"\']+(["\'])',
+              r'\g<1>8.5.2\2',
+              s,
+              count=1
+          )
+
+          if count == 0:
+              raise SystemExit("Android Gradle Plugin version not found")
+
+          p.write_text(s)
+
+          w = Path("android/gradle/wrapper/gradle-wrapper.properties")
+          s = w.read_text()
+          s = re.sub(
+              r'gradle-[0-9.]+-(all|bin)\.zip',
+              r'gradle-8.7-\1.zip',
+              s
+          )
+          w.write_text(s)
+          PY
+          
+
       - name: Get dependencies
         run: flutter pub get
 
