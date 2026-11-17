@@ -137,6 +137,12 @@ jobs:
           p.write_text(p.read_text() + """
           
           subprojects {
+              afterEvaluate { subproject ->
+                  def androidExtension = subproject.extensions.findByName("android")
+                  if (androidExtension != null) {
+                      androidExtension.compileSdkVersion(36)
+                  }
+              }
               tasks.configureEach {
                   if (name.startsWith("lintVital")) {
                       enabled = false
