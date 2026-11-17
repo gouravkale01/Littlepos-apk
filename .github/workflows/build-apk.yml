@@ -1,0 +1,94 @@
+
+name: Build LittlePOS APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Extract ZIP and prepare Android
+        shell: bash
+        run: |
+          set -e
+          ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "LittlePOS ZIP not found"
+            exit 1
+          fi
+
+          mkdir -p _littlepos_src
+          unzip -q "$ZIP_FILE" -d _littlepos_src
+
+          PUBSPEC="$(find _littlepos_src -name pubspec.yaml -type f -print -quit)"
+          if [ -z "$PUBSPEC" ]; then
+            echo "pubspec.yaml not found"
+            exit 1
+          fi
+
+          APP_DIR="$(dirname "$PUBSPEC")"
+          cp -a "$APP_DIR"/. .
+          mkdir -p assets
+
+          flutter create --platforms=android --org com.kaayansh.littlepos .
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+
+          permissions = [
+              "android.permission.INTERNET",
+              "android.permission.ACCESS_NETWORK_STATE",
+              "android.permission.ACCESS_WIFI_STATE",
+          ]
+
+          for permission in permissions:
+              if permission not in s:
+                  s = re.sub(
+                      r"(<application\\b)",
+                      f'<uses-permission android:name="{permission}" />\\n    \\\\1',
+                      s,
+                      count=1
+                  )
+
+          if "android:usesCleartextTraffic" not in s:
+              s = s.replace(
+                  "<application",
+                  '<application android:usesCleartextTraffic="true"',
+                  1
+              )
+
+          p.write_text(s)
+          PY
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: littlepos-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          
