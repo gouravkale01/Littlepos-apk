@@ -65,6 +65,31 @@ jobs:
       - name: Generate Android files
         run: flutter create --platforms=android --project-name kaayansh_boutique_pos .
 
+      - name: Set Android compile SDK 36
+        shell: bash
+        run: |
+          sdkmanager "platforms;android-36"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("android/app/build.gradle")
+          if p.exists():
+              s = p.read_text()
+              s, n = re.subn(r'compileSdk(?:Version)?\\s+.*', 'compileSdkVersion 36', s, count=1)
+              if not n:
+                  s = s.replace('android {', 'android {\\n    compileSdkVersion 36', 1)
+              p.write_text(s)
+          else:
+              p = Path("android/app/build.gradle.kts")
+              if not p.exists():
+                  raise SystemExit("Android app Gradle file not found")
+              s = p.read_text()
+              s, n = re.subn(r'compileSdk\\s*=\\s*.*', 'compileSdk = 36', s, count=1)
+              if not n:
+                  s = s.replace('android {', 'android {\\n    compileSdk = 36', 1)
+              p.write_text(s)
+          PY
+
       - name: Add Android permissions
         shell: bash
         run: |
