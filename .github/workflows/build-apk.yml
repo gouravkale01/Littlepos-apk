@@ -169,6 +169,21 @@ jobs:
               raise SystemExit("Could not patch required plugin(s): " + ", ".join(sorted(missing)))
           PY
 
+      - name: Install required Android CMake
+        shell: bash
+        run: |
+          SDKMANAGER="$(find \"$ANDROID_HOME/cmdline-tools\" -name sdkmanager -type f | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android sdkmanager not found"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "cmake;3.22.1"
+          test -d "$ANDROID_HOME/cmake/3.22.1" || {
+            echo "CMake 3.22.1 installation was not completed"
+            exit 1
+          }
+
       - name: Build Release APK
         run: flutter build apk --release
 
