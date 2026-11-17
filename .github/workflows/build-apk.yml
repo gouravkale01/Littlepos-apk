@@ -118,7 +118,7 @@ jobs:
               raise SystemExit("Android application tag missing")
           for item in permissions:
               if item.split('"')[1] not in s:
-                  s = s.replace(marker, '    ' + item + '\\n    ' + marker, 1)
+                  s = s.replace(marker, '    ' + item + '\n    ' + marker, 1)
           p.write_text(s)
           PY
 
