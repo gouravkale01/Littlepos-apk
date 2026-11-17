@@ -125,52 +125,26 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Set Android plugin compile SDK 36 and disable lintVital
+      - name: Configure Android library plugins for SDK 36
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          cache = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
-          changed = []
-          for p in cache.glob("*/android/build.gradle*"):
-              s = p.read_text()
-              original = s
-              if p.suffix == ".kts":
-                  s = re.sub(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', s)
-              else:
-                  s = re.sub(r'compileSdkVersion\s+[^\n]+', 'compileSdkVersion 36', s)
-                  s = re.sub(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', s)
-              if s != original:
-                  p.write_text(s)
-                  changed.append(str(p))
-          print("Updated plugin Gradle files:", changed)
-          if not changed:
-              raise SystemExit("No plugin compileSdk declarations were updated")
-          PY
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("android/build.gradle.kts")
-          if p.exists():
-              p.write_text(p.read_text() + """
-          tasks.configureEach {
-              if (name.startsWith("lintVital")) {
-                  enabled = false
-              }
-          }
-          """)
-          else:
-              p = Path("android/build.gradle")
-              p.write_text(p.read_text() + """
+          cat >> android/build.gradle.kts <<'KOTLIN'
+          
+          // Set plugin Android library compile SDK without editing package source files.
           subprojects {
-              tasks.configureEach {
-                  if (name.startsWith("lintVital")) {
-                      enabled = false
-                  }
+              plugins.withId("com.android.library") {
+                  val androidExtension = extensions.findByName("android")
+                      ?: throw GradleException("Android extension missing for $name")
+                  val compileSdkSetter = androidExtension.javaClass.methods.firstOrNull {
+                      (it.name == "setCompileSdk" || it.name == "setCompileSdkVersion") &&
+                          it.parameterCount == 1 &&
+                          (it.parameterTypes[0] == Int::class.javaPrimitiveType ||
+                           it.parameterTypes[0] == Int::class.java)
+                  } ?: throw GradleException("Could not find compileSdk setter for $name")
+                  compileSdkSetter.invoke(androidExtension, 36)
               }
           }
-          """)
-          PY
+          KOTLIN
 
       - name: Build Release APK
         run: flutter build apk --release
