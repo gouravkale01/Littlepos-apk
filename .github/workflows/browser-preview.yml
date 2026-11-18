@@ -31,6 +31,18 @@ jobs:
           test -f pubspec.yaml
           test -d lib
 
+      - name: Inspect mobile layout source
+        shell: bash
+        run: |
+          echo "=== DART FILES ==="
+          find lib -type f -name '*.dart' -print
+          echo "=== ORIENTATION AND LAYOUT SETTINGS ==="
+          grep -RniE 'DeviceOrientation|SystemChrome|setPreferredOrientations|RotatedBox|OrientationBuilder|MediaQuery|landscape|portrait|SingleChildScrollView|ListView|GridView|overflow' lib || true
+          echo "=== APP ENTRY AND SCREEN SIZES ==="
+          for f in lib/main.dart lib/app.dart lib/screens/dashboard_screen.dart lib/screens/billing_screen.dart; do
+            if [ -f "$f" ]; then echo "--- $f ---"; sed -n '1,260p' "$f"; fi
+          done
+
       - name: Repair Dart source for browser compilation
         shell: bash
         run: |
