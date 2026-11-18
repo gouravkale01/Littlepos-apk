@@ -75,7 +75,7 @@ jobs:
           # Adapt the original V2 database initializer for browser SQLite and native paths.
           # The V2 archive uses "final dir" and an inline openDatabase(join(...)).
           pattern = re.compile(
-              r"final\\s+dir\\s*=\\s*await\\s+getApplicationDocumentsDirectory\\(\\)\\s*;\\s*return\\s+openDatabase\\(join\\(dir\\.path\\s*,\\s*filePath\\)\\s*,"
+              r"final\s+dir\s*=\s*await\s+getApplicationDocumentsDirectory\(\)\s*;\s*return\s+openDatabase\(join\(dir\.path\s*,\s*filePath\)\s*,"
           )
           replacement = "final dir = kIsWeb ? null : await getApplicationDocumentsDirectory();\\n    return openDatabase(kIsWeb ? filePath : join(dir!.path, filePath),"
           s, count = pattern.subn(lambda m: replacement, s, count=1)
