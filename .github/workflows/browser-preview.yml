@@ -58,12 +58,12 @@ jobs:
           s = p.read_text()
           if "package:flutter/services.dart" not in s:
               s = s.replace("import 'package:flutter/material.dart';",
-                  "import 'package:flutter/material.dart';\\nimport 'package:flutter/services.dart';")
+                  "import 'package:flutter/material.dart';\nimport 'package:flutter/services.dart';")
           if "SystemChrome.setPreferredOrientations" not in s:
               s = s.replace("  WidgetsFlutterBinding.ensureInitialized();",
-                  "  WidgetsFlutterBinding.ensureInitialized();\\n"
-                  "  if (!kIsWeb) {\\n"
-                  "    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);\\n"
+                  "  WidgetsFlutterBinding.ensureInitialized();\n"
+                  "  if (!kIsWeb) {\n"
+                  "    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);\n"
                   "  }")
           p.write_text(s)
           # path_provider's documents directory is unavailable in browsers.
@@ -77,7 +77,7 @@ jobs:
           pattern = re.compile(
               r"final\s+dir\s*=\s*await\s+getApplicationDocumentsDirectory\(\)\s*;\s*return\s+openDatabase\(join\(dir\.path\s*,\s*filePath\)\s*,"
           )
-          replacement = "final dir = kIsWeb ? null : await getApplicationDocumentsDirectory();\\n    return openDatabase(kIsWeb ? filePath : join(dir!.path, filePath),"
+          replacement = "final dir = kIsWeb ? null : await getApplicationDocumentsDirectory();\n    return openDatabase(kIsWeb ? filePath : join(dir!.path, filePath),"
           s, count = pattern.subn(lambda m: replacement, s, count=1)
           if count == 0 and "openDatabase(kIsWeb ? filePath" not in s:
               print("===== UNMATCHED db_helper.dart =====")
@@ -85,7 +85,7 @@ jobs:
               raise SystemExit("Could not identify V2 database initializer")
           s = s.replace(
               "  Future<String> getImagesDirectory() async {",
-              "  Future<String> getImagesDirectory() async {\\n    if (kIsWeb) return '';",
+              "  Future<String> getImagesDirectory() async {\n    if (kIsWeb) return '';",
               1
           )
           s = s.replace(
