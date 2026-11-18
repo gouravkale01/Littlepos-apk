@@ -75,8 +75,8 @@ jobs:
           # Adapt the original V2 database initializer for browser SQLite and native paths.
           # Use a whitespace-tolerant match for the DB initializer in the ZIP.
           pattern = re.compile(
-              r"(?m)^(?P<indent>\\s*)final\\s+(?P<dir>\\w+)\\s*=\\s*await\\s+getApplicationDocumentsDirectory\\(\\)\\s*;\\s*"
-              r"(?P=indent)final\\s+(?P<path>\\w+)\\s*=\\s*join\\(\\s*(?P=dir)\\.path\\s*,\\s*filePath\\s*\\)\\s*;"
+              r"(?m)^(?P<indent>\s*)final\s+(?P<dir>\w+)\s*=\s*await\s+getApplicationDocumentsDirectory\(\)\s*;\s*"
+              r"(?P=indent)final\s+(?P<path>\w+)\s*=\s*join\(\s*(?P=dir)\.path\s*,\s*filePath\s*\)\s*;"
           )
           def replace_db_path(m):
               indent, path_var = m.group("indent"), m.group("path")
