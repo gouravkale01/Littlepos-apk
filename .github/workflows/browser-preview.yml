@@ -59,9 +59,13 @@ jobs:
           s = p.read_text()
           if "package:flutter/foundation.dart" not in s:
               s = s.replace("import 'dart:io';", "import 'dart:io';\nimport 'package:flutter/foundation.dart';")
-          s = s.replace(
-              "    final dir = await getApplicationDocumentsDirectory();\n    return openDatabase(join(dir.path, filePath), version: 4,",
-              "    final dbPath = kIsWeb ? filePath : join((await getApplicationDocumentsDirectory()).path, filePath);\n    return openDatabase(dbPath, version: 4,")
+          # Adapt the original V2 database initializer for browser SQLite and native paths.
+          old = "    final dbPath = await getApplicationDocumentsDirectory();\n    final path = join(dbPath.path, filePath);\n\n    return await openDatabase(\n      path,\n      version: 1,"
+          new = "    final path = kIsWeb ? filePath : join((await getApplicationDocumentsDirectory()).path, filePath);\n\n    return await openDatabase(\n      path,\n      version: 1,"
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif "final path = kIsWeb ? filePath" not in s:
+              raise SystemExit("DB initializer patch target not found; stopping safely")
           p.write_text(s)
           PY
 
