@@ -18,8 +18,6 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # Keep the job off the protected github-pages environment while diagnosing
-    # runner startup; deploy-pages still publishes the Pages artifact via OIDC.
     steps:
       - name: Checkout browser preview branch
         uses: actions/checkout@v4
@@ -30,17 +28,35 @@ jobs:
           test -f pubspec.yaml
           test -d lib
 
-      - name: Inspect mobile layout source
+      - name: Configure browser database
         shell: bash
         run: |
-          echo "=== DART FILES ==="
-          find lib -type f -name '*.dart' -print
-          echo "=== ORIENTATION AND LAYOUT SETTINGS ==="
-          grep -RniE 'DeviceOrientation|SystemChrome|setPreferredOrientations|RotatedBox|OrientationBuilder|MediaQuery|landscape|portrait|SingleChildScrollView|ListView|GridView|overflow' lib || true
-          echo "=== APP ENTRY AND SCREEN SIZES ==="
-          for f in lib/main.dart lib/app.dart lib/screens/dashboard_screen.dart lib/screens/billing_screen.dart; do
-            if [ -f "$f" ]; then echo "--- $f ---"; sed -n '1,260p' "$f"; fi
-          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("pubspec.yaml")
+          s = p.read_text()
+          if "sqflite_common_ffi_web:" not in s:
+              s = re.sub(r"(?m)^dependencies:\s*$", "dependencies:\n  sqflite_common_ffi_web: ^0.4.5+4", s, count=1)
+          p.write_text(s)
+          p = Path("lib/main.dart")
+          s = p.read_text()
+          if "sqflite_common_ffi_web/sqflite_ffi_web.dart" not in s:
+              s = s.replace("import 'package:flutter/material.dart';",
+                  "import 'package:flutter/material.dart';\n"
+                  "import 'package:sqflite/sqflite.dart' as sqflite;\n"
+                  "import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';")
+          s = s.replace("  await DatabaseHelper.instance.database;",
+              "  if (const bool.fromEnvironment('dart.library.js_interop')) {\n"
+              "    sqflite.databaseFactory = databaseFactoryFfiWeb;\n"
+              "  }\n"
+              "  await DatabaseHelper.instance.database;")
+          p.write_text(s)
+          PY
+          echo "=== Browser DB dependencies ==="
+          grep -n -A8 '^dependencies:' pubspec.yaml
+          echo "=== Browser DB startup ==="
+          sed -n '1,35p' lib/main.dart
 
       - name: Repair Dart source for browser compilation
         shell: bash
@@ -54,10 +70,7 @@ jobs:
               p.write_text("\n".join(lines) + "\n")
           p = Path("lib/screens/dashboard_screen.dart")
           if p.exists():
-              s = p.read_text().replace(
-                  "pw.Padding(padding: const EdgeInsets.",
-                  "pw.Padding(padding: const pw.EdgeInsets."
-              )
+              s = p.read_text().replace("pw.Padding(padding: const EdgeInsets.", "pw.Padding(padding: const pw.EdgeInsets.")
               p.write_text(s)
           PY
 
