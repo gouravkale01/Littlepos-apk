@@ -53,6 +53,16 @@ jobs:
               "  }\n"
               "  await DatabaseHelper.instance.database;")
           p.write_text(s)
+          # path_provider's documents directory is unavailable in browsers.
+          # Keep the native Android path unchanged; web SQLite uses a database name.
+          p = Path("lib/database/db_helper.dart")
+          s = p.read_text()
+          if "package:flutter/foundation.dart" not in s:
+              s = s.replace("import 'dart:io';", "import 'dart:io';\\nimport 'package:flutter/foundation.dart';")
+          s = s.replace(
+              "    final dir = await getApplicationDocumentsDirectory();\\n    return openDatabase(join(dir.path, filePath), version: 4,",
+              "    final dbPath = kIsWeb ? filePath : join((await getApplicationDocumentsDirectory()).path, filePath);\\n    return openDatabase(dbPath, version: 4,")
+          p.write_text(s)
           PY
 
       - name: Repair Dart source for browser compilation
