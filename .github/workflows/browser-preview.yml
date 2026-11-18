@@ -92,7 +92,9 @@ jobs:
       - name: Browser runtime smoke test
         shell: bash
         run: |
-          python3 -m http.server 4173 --directory build/web > /tmp/littlepos-http.log 2>&1 &
+          mkdir -p /tmp/littlepos-www/Littlepos-apk
+          cp -a build/web/. /tmp/littlepos-www/Littlepos-apk/
+          python3 -m http.server 4173 --directory /tmp/littlepos-www > /tmp/littlepos-http.log 2>&1 &
           echo $! > /tmp/littlepos-http.pid
           npm install --no-save playwright
           npx playwright install --with-deps chromium
@@ -104,7 +106,7 @@ jobs:
             page.on('pageerror', e => console.error('PAGE_ERROR:', e.stack || e.message));
             page.on('console', m => { if (m.type() === 'error') console.error('CONSOLE_ERROR:', m.text()); });
             page.on('requestfailed', r => console.error('REQUEST_FAILED:', r.url(), r.failure()?.errorText));
-            const response = await page.goto('http://127.0.0.1:4173/', {waitUntil:'networkidle', timeout:60000});
+            const response = await page.goto('http://127.0.0.1:4173/Littlepos-apk/', {waitUntil:'networkidle', timeout:60000});
             await page.waitForTimeout(15000);
             const result = await page.evaluate(() => ({title:document.title, bodyText:document.body.innerText, canvases:document.querySelectorAll('flt-glass-pane,canvas').length, html:document.body.innerHTML.slice(0,1500)}));
             console.log('SMOKE_HTTP_STATUS:', response?.status());
