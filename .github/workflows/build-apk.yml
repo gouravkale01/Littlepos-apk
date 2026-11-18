@@ -35,7 +35,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           for p in sorted(Path("lib").rglob("*.dart")):
-              print("\\n===== SOURCE:", p, "=====")
+              print("\n===== SOURCE:", p, "=====")
               text = p.read_text(errors="replace")
               print(text[:18000])
           PY
@@ -89,7 +89,7 @@ jobs:
           p = Path("android/app/build.gradle.kts")
           if p.exists():
               s = p.read_text()
-              s, n = re.subn(r'compileSdk\\s*=\\s*[^\\n]+', 'compileSdk = 36', s, count=1)
+              s, n = re.subn(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', s, count=1)
               if not n:
                   s = s.replace('android {', 'android {\n    compileSdk = 36', 1)
               p.write_text(s)
@@ -98,9 +98,9 @@ jobs:
               if not p.exists():
                   raise SystemExit("Android app Gradle file not found")
               s = p.read_text()
-              s, n = re.subn(r'compileSdk(?:Version)?\\s+[^\\n]+', 'compileSdkVersion 36', s, count=1)
+              s, n = re.subn(r'compileSdk(?:Version)?\s+[^\n]+', 'compileSdkVersion 36', s, count=1)
               if not n:
-                  s = s.replace('android {', 'android {\\n    compileSdkVersion 36', 1)
+                  s = s.replace('android {', 'android {\n    compileSdkVersion 36', 1)
               p.write_text(s)
           PY
 
@@ -123,7 +123,7 @@ jobs:
               raise SystemExit("Android application tag missing")
           for item in permissions:
               if item.split('"')[1] not in s:
-                  s = s.replace(marker, '    ' + item + '\\n    ' + marker, 1)
+                  s = s.replace(marker, '    ' + item + '\n    ' + marker, 1)
           p.write_text(s)
           PY
 
@@ -164,7 +164,7 @@ jobs:
                   updated.append(line)
 
               if touched:
-                  gradle_file.write_text("\\n".join(updated) + "\\n")
+                  gradle_file.write_text("\n".join(updated) + "\n")
                   changed.append(str(gradle_file))
                   found.add(package)
 
