@@ -51,7 +51,7 @@ jobs:
               "  if (kIsWeb) {\n"
               "    sqflite.databaseFactory = databaseFactoryFfiWeb;\n"
               "  }\n"
-              "  await DatabaseHelper.instance.database;")
+              "  // Initialize the database lazily after the login UI is mounted.\n")
           p.write_text(s)
           # path_provider's documents directory is unavailable in browsers.
           # Keep the native Android path unchanged; web SQLite uses a database name.
@@ -130,8 +130,8 @@ jobs:
             page.on('console', m => { if (m.type() === 'error') { console.error('CONSOLE_ERROR:', m.text()); errors.push(new Error(m.text())); } });
             page.on('requestfailed', r => { console.error('REQUEST_FAILED:', r.url(), r.failure()?.errorText); errors.push(new Error('Request failed: '+r.url())); });
             page.on('response', r => { if (r.status() >= 400) console.error('HTTP_ERROR:', r.status(), r.url()); });
-            const response = await page.goto('http://127.0.0.1:4173/Littlepos-apk/', {waitUntil:'networkidle', timeout:60000});
-            await page.waitForTimeout(15000);
+            const response = await page.goto('http://127.0.0.1:4173/Littlepos-apk/', {waitUntil:'domcontentloaded', timeout:30000});
+            await page.waitForTimeout(10000);
             const result = await page.evaluate(() => ({title:document.title, bodyText:document.body.innerText, canvases:document.querySelectorAll('flt-glass-pane,canvas').length, html:document.body.innerHTML.slice(0,1500)}));
             console.log('SMOKE_HTTP_STATUS:', response?.status());
             console.log('SMOKE_PAGE_RESULT:', JSON.stringify(result));
