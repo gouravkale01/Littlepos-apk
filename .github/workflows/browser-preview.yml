@@ -113,7 +113,7 @@ jobs:
             if (!response || !response.ok() || (!result.bodyText.trim() && result.canvases === 0)) process.exit(1);
           })().catch(e => { console.error(e); process.exit(1); });
           JS
-          node /tmp/littlepos-smoke.cjs
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules" node /tmp/littlepos-smoke.cjs
           kill $(cat /tmp/littlepos-http.pid) || true
 
       - name: Configure GitHub Pages
