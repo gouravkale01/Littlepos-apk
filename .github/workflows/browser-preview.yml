@@ -37,26 +37,22 @@ jobs:
           p = Path("pubspec.yaml")
           s = p.read_text()
           if "sqflite_common_ffi_web:" not in s:
-              s = re.sub(r"(?m)^dependencies:\s*$", "dependencies:\n  sqflite_common_ffi_web: ^0.4.5+4", s, count=1)
+              s = re.sub(r"(?m)^dependencies:\s*$", "dependencies:\\n  sqflite_common_ffi_web: ^0.4.5+4", s, count=1)
           p.write_text(s)
           p = Path("lib/main.dart")
           s = p.read_text()
           if "sqflite_common_ffi_web/sqflite_ffi_web.dart" not in s:
               s = s.replace("import 'package:flutter/material.dart';",
-                  "import 'package:flutter/material.dart';\n"
-                  "import 'package:sqflite/sqflite.dart' as sqflite;\n"
+                  "import 'package:flutter/material.dart';\\n"
+                  "import 'package:sqflite/sqflite.dart' as sqflite;\\n"
                   "import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';")
           s = s.replace("  await DatabaseHelper.instance.database;",
-              "  if (const bool.fromEnvironment('dart.library.js_interop')) {\n"
-              "    sqflite.databaseFactory = databaseFactoryFfiWeb;\n"
-              "  }\n"
+              "  if (const bool.fromEnvironment('dart.library.js_interop')) {\\n"
+              "    sqflite.databaseFactory = databaseFactoryFfiWeb;\\n"
+              "  }\\n"
               "  await DatabaseHelper.instance.database;")
           p.write_text(s)
           PY
-          echo "=== Browser DB dependencies ==="
-          grep -n -A8 '^dependencies:' pubspec.yaml
-          echo "=== Browser DB startup ==="
-          sed -n '1,35p' lib/main.dart
 
       - name: Repair Dart source for browser compilation
         shell: bash
@@ -67,7 +63,7 @@ jobs:
           if p.exists():
               lines = p.read_text().splitlines()
               lines = [line.replace("bool get _gst=", "bool get _gst => ", 1) if "bool get _gst=" in line else line for line in lines]
-              p.write_text("\n".join(lines) + "\n")
+              p.write_text("\\n".join(lines) + "\\n")
           p = Path("lib/screens/dashboard_screen.dart")
           if p.exists():
               s = p.read_text().replace("pw.Padding(padding: const EdgeInsets.", "pw.Padding(padding: const pw.EdgeInsets.")
@@ -96,6 +92,9 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
+
+      - name: Wait for Pages artifact registration
+        run: sleep 15
 
       - name: Publish browser preview
         id: deployment
