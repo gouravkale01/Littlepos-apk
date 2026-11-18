@@ -29,6 +29,17 @@ jobs:
             exit 1
           }
 
+      - name: Inspect V2 UI source
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for p in sorted(Path("lib").rglob("*.dart")):
+              print("\\n===== SOURCE:", p, "=====")
+              text = p.read_text(errors="replace")
+              print(text[:18000])
+          PY
+
       - name: Fix known Dart compile errors
         shell: bash
         run: |
