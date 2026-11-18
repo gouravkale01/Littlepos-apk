@@ -71,6 +71,16 @@ jobs:
               p.write_text(s)
           PY
 
+      - name: Inspect browser startup and database code
+        shell: bash
+        run: |
+          echo "===== lib/main.dart ====="
+          sed -n '1,220p' lib/main.dart
+          echo "===== database-related source files ====="
+          find lib -type f | grep -Ei 'database|db|helper' || true
+          echo "===== database calls and configuration ====="
+          grep -R -n -E 'openDatabase|DatabaseHelper|databaseFactory|singleInstance|path_provider|getDatabasesPath' lib | head -160 || true
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
