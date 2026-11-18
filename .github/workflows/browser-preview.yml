@@ -103,20 +103,32 @@ jobs:
           (async () => {
             const browser = await chromium.launch({headless:true});
             const page = await browser.newPage();
-            page.on('pageerror', e => console.error('PAGE_ERROR:', e.stack || e.message));
-            page.on('console', m => { if (m.type() === 'error') console.error('CONSOLE_ERROR:', m.text()); });
-            page.on('requestfailed', r => console.error('REQUEST_FAILED:', r.url(), r.failure()?.errorText));
+            const errors = [];
+            page.on('pageerror', e => { errors.push(e); console.error('PAGE_ERROR_MESSAGE:', e.message); console.error('PAGE_ERROR_STACK:', e.stack); });
+            page.on('console', m => { if (m.type() === 'error') { console.error('CONSOLE_ERROR:', m.text()); errors.push(new Error(m.text())); } });
+            page.on('requestfailed', r => { console.error('REQUEST_FAILED:', r.url(), r.failure()?.errorText); errors.push(new Error('Request failed: '+r.url())); });
+            page.on('response', r => { if (r.status() >= 400) console.error('HTTP_ERROR:', r.status(), r.url()); });
             const response = await page.goto('http://127.0.0.1:4173/Littlepos-apk/', {waitUntil:'networkidle', timeout:60000});
             await page.waitForTimeout(15000);
             const result = await page.evaluate(() => ({title:document.title, bodyText:document.body.innerText, canvases:document.querySelectorAll('flt-glass-pane,canvas').length, html:document.body.innerHTML.slice(0,1500)}));
             console.log('SMOKE_HTTP_STATUS:', response?.status());
             console.log('SMOKE_PAGE_RESULT:', JSON.stringify(result));
+            await page.screenshot({path:'/tmp/littlepos-browser.png', fullPage:true});
+            console.log('SMOKE_ERROR_COUNT:', errors.length);
             await browser.close();
-            if (!response || !response.ok() || (!result.bodyText.trim() && result.canvases === 0)) process.exit(1);
+            if (!response || !response.ok() || errors.length > 0 || (!result.bodyText.trim() && result.canvases === 0)) process.exit(1);
           })().catch(e => { console.error(e); process.exit(1); });
           JS
           NODE_PATH="$GITHUB_WORKSPACE/node_modules" node /tmp/littlepos-smoke.cjs
           kill $(cat /tmp/littlepos-http.pid) || true
+
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LittlePOS-browser-diagnostics
+          path: /tmp/littlepos-browser.png
+          if-no-files-found: ignore
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
