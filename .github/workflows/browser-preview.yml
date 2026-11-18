@@ -44,10 +44,11 @@ jobs:
           if "sqflite_common_ffi_web/sqflite_ffi_web.dart" not in s:
               s = s.replace("import 'package:flutter/material.dart';",
                   "import 'package:flutter/material.dart';\n"
+                  "import 'package:flutter/foundation.dart';\n"
                   "import 'package:sqflite/sqflite.dart' as sqflite;\n"
                   "import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';")
           s = s.replace("  await DatabaseHelper.instance.database;",
-              "  if (const bool.fromEnvironment('dart.library.js_interop')) {\n"
+              "  if (kIsWeb) {\n"
               "    sqflite.databaseFactory = databaseFactoryFfiWeb;\n"
               "  }\n"
               "  await DatabaseHelper.instance.database;")
@@ -81,6 +82,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Prepare SQLite WebAssembly and worker
+        run: dart run sqflite_common_ffi_web:setup
 
       - name: Build browser preview
         run: flutter build web --release --no-wasm-dry-run --base-href "/Littlepos-apk/"
