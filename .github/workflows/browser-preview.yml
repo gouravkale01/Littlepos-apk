@@ -1,0 +1,78 @@
+name: LittlePOS Browser Preview
+
+on:
+  push:
+    branches:
+      - browser-preview
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: littlepos-browser-preview
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout browser preview branch
+        uses: actions/checkout@v4
+
+      - name: Extract V2 app source
+        run: |
+          unzip -o littlepos-v2-final.zip -d .
+          test -f pubspec.yaml
+          test -d lib
+
+      - name: Repair Dart source for browser compilation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("lib/screens/billing_screen.dart")
+          if p.exists():
+              lines = p.read_text().splitlines()
+              lines = [line.replace("bool get _gst=", "bool get _gst => ", 1) if "bool get _gst=" in line else line for line in lines]
+              p.write_text("\n".join(lines) + "\n")
+          p = Path("lib/screens/dashboard_screen.dart")
+          if p.exists():
+              s = p.read_text().replace(
+                  "pw.Padding(padding: const EdgeInsets.",
+                  "pw.Padding(padding: const pw.EdgeInsets."
+              )
+              p.write_text(s)
+          PY
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate web platform files
+        run: flutter create --platforms=web --project-name kaayansh_boutique_pos .
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build browser preview
+        run: flutter build web --release --no-wasm-dry-run --base-href "/Littlepos-apk/"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload browser build
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Publish browser preview
+        id: deployment
+        uses: actions/deploy-pages@v4
