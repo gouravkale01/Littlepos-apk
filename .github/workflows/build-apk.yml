@@ -198,6 +198,69 @@ jobs:
             exit 1
           }
 
+      - name: Configure permanent Android release signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/littlepos-upload.jks
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle.kts")
+          s = p.read_text()
+          if 'signingConfigs.create("release")' in s:
+              raise SystemExit("Release signing already configured; refusing duplicate patch")
+          start = s.find("android {")
+          if start < 0:
+              raise SystemExit("android block missing")
+          depth = 0
+          quote = None
+          escaped = False
+          end = None
+          for i in range(start + len("android "), len(s)):
+              ch = s[i]
+              if quote:
+                  if escaped: escaped = False
+                  elif ch == "\\\\": escaped = True
+                  elif ch == quote: quote = None
+                  continue
+              if ch in ('"', "'"): quote = ch
+              elif ch == "{": depth += 1
+              elif ch == "}":
+                  depth -= 1
+                  if depth == 0:
+                      end = i
+                      break
+          if end is None:
+              raise SystemExit("Could not locate end of android block")
+          signing = '''
+              signingConfigs {
+                  create("release") {
+                      storeFile = file("littlepos-upload.jks")
+                      storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  getByName("release") {
+                      signingConfig = signingConfigs.getByName("release")
+                  }
+              }
+          '''
+          p.write_text(s[:end] + signing + s[end:])
+          PY
+
       - name: Build Release APK
         run: flutter build apk --release
 
