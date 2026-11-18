@@ -45,24 +45,21 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           p = Path("lib/screens/billing_screen.dart")
           if p.exists():
               s = p.read_text()
-              s = s.replace(
-                  "bool get _gst=(_company?['gst_registered'] as int? ?? 0)==1;",
-                  "bool get _gst => (_company?['gst_registered'] as int? ?? 0) == 1;"
-              )
-              s = s.replace(
-                  "pw.Padding(padding: const EdgeInsets.all(",
-                  "pw.Padding(padding: const pw.EdgeInsets.all("
-              )
+              s, n = re.subn(r"bool get _gst\\s*=\\s*(.*?);", r"bool get _gst => \\1;", s)
+              if n == 0 and "bool get _gst =>" not in s:
+                  raise SystemExit("Could not repair GST getter in billing_screen.dart")
               p.write_text(s)
 
           p = Path("lib/screens/dashboard_screen.dart")
           if p.exists():
               s = p.read_text().replace(
-                  "pw.Padding(padding: const EdgeInsets.all(",
-                  "pw.Padding(padding: const pw.EdgeInsets.all("
+                  "pw.Padding(padding: const EdgeInsets.",
+                  "pw.Padding(padding: const pw.EdgeInsets."
               )
               p.write_text(s)
           PY
@@ -97,7 +94,7 @@ jobs:
               s = p.read_text()
               s, n = re.subn(r'compileSdk\\s*=\\s*[^\\n]+', 'compileSdk = 36', s, count=1)
               if not n:
-                  s = s.replace('android {', 'android {\\n    compileSdk = 36', 1)
+                  s = s.replace('android {', 'android {\n    compileSdk = 36', 1)
               p.write_text(s)
           else:
               p = Path("android/app/build.gradle")
