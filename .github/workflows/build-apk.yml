@@ -172,7 +172,10 @@ jobs:
       - name: Install required Android CMake
         shell: bash
         run: |
-          SDKMANAGER="$(find \"$ANDROID_HOME/cmdline-tools\" -name sdkmanager -type f | head -n 1)"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          fi
           if [ -z "$SDKMANAGER" ]; then
             echo "Android sdkmanager not found"
             exit 1
