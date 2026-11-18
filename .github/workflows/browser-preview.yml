@@ -89,6 +89,33 @@ jobs:
       - name: Build browser preview
         run: flutter build web --release --no-wasm-dry-run --base-href "/Littlepos-apk/"
 
+      - name: Browser runtime smoke test
+        shell: bash
+        run: |
+          python3 -m http.server 4173 --directory build/web > /tmp/littlepos-http.log 2>&1 &
+          echo $! > /tmp/littlepos-http.pid
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          cat > /tmp/littlepos-smoke.cjs <<'JS'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage();
+            page.on('pageerror', e => console.error('PAGE_ERROR:', e.stack || e.message));
+            page.on('console', m => { if (m.type() === 'error') console.error('CONSOLE_ERROR:', m.text()); });
+            page.on('requestfailed', r => console.error('REQUEST_FAILED:', r.url(), r.failure()?.errorText));
+            const response = await page.goto('http://127.0.0.1:4173/', {waitUntil:'networkidle', timeout:60000});
+            await page.waitForTimeout(15000);
+            const result = await page.evaluate(() => ({title:document.title, bodyText:document.body.innerText, canvases:document.querySelectorAll('flt-glass-pane,canvas').length, html:document.body.innerHTML.slice(0,1500)}));
+            console.log('SMOKE_HTTP_STATUS:', response?.status());
+            console.log('SMOKE_PAGE_RESULT:', JSON.stringify(result));
+            await browser.close();
+            if (!response || !response.ok() || (!result.bodyText.trim() && result.canvases === 0)) process.exit(1);
+          })().catch(e => { console.error(e); process.exit(1); });
+          JS
+          node /tmp/littlepos-smoke.cjs
+          kill $(cat /tmp/littlepos-http.pid) || true
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
