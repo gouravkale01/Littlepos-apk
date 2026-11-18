@@ -73,19 +73,26 @@ jobs:
           if "package:flutter/foundation.dart" not in s:
               s = s.replace("import 'dart:io';", "import 'dart:io';\nimport 'package:flutter/foundation.dart';")
           # Adapt the original V2 database initializer for browser SQLite and native paths.
-          # Use a whitespace-tolerant match for the DB initializer in the ZIP.
+          # The V2 archive uses "final dir" and an inline openDatabase(join(...)).
           pattern = re.compile(
-              r"(?m)^(?P<indent>\s*)final\s+(?P<dir>\w+)\s*=\s*await\s+getApplicationDocumentsDirectory\(\)\s*;\s*"
-              r"(?P=indent)final\s+(?P<path>\w+)\s*=\s*join\(\s*(?P=dir)\.path\s*,\s*filePath\s*\)\s*;"
+              r"final\\s+dir\\s*=\\s*await\\s+getApplicationDocumentsDirectory\\(\\)\\s*;\\s*return\\s+openDatabase\\(join\\(dir\\.path\\s*,\\s*filePath\\)\\s*,"
           )
-          def replace_db_path(m):
-              indent, path_var = m.group("indent"), m.group("path")
-              return f"{indent}final {path_var} = kIsWeb ? filePath : join((await getApplicationDocumentsDirectory()).path, filePath);"
-          s, count = pattern.subn(replace_db_path, s, count=1)
-          if count == 0 and "kIsWeb ? filePath" not in s:
+          replacement = "final dir = kIsWeb ? null : await getApplicationDocumentsDirectory();\\n    return openDatabase(kIsWeb ? filePath : join(dir!.path, filePath),"
+          s, count = pattern.subn(lambda m: replacement, s, count=1)
+          if count == 0 and "openDatabase(kIsWeb ? filePath" not in s:
               print("===== UNMATCHED db_helper.dart =====")
               print(s)
-              raise SystemExit("Could not identify DB path initializer in source archive")
+              raise SystemExit("Could not identify V2 database initializer")
+          s = s.replace(
+              "  Future<String> getImagesDirectory() async {",
+              "  Future<String> getImagesDirectory() async {\\n    if (kIsWeb) return '';",
+              1
+          )
+          s = s.replace(
+              "  Future<String> databaseFilePath() async { final dir=await getApplicationDocumentsDirectory();",
+              "  Future<String> databaseFilePath() async { if (kIsWeb) return ''; final dir=await getApplicationDocumentsDirectory();",
+              1
+          )
           p.write_text(s)
           PY
 
