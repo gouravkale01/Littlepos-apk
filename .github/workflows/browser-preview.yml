@@ -53,6 +53,19 @@ jobs:
               "  }\n"
               "  // Initialize the database lazily after the login UI is mounted.\n")
           p.write_text(s)
+          # Force portrait orientation on native Android, but never call this channel on web.
+          p = Path("lib/main.dart")
+          s = p.read_text()
+          if "package:flutter/services.dart" not in s:
+              s = s.replace("import 'package:flutter/material.dart';",
+                  "import 'package:flutter/material.dart';\\nimport 'package:flutter/services.dart';")
+          if "SystemChrome.setPreferredOrientations" not in s:
+              s = s.replace("  WidgetsFlutterBinding.ensureInitialized();",
+                  "  WidgetsFlutterBinding.ensureInitialized();\\n"
+                  "  if (!kIsWeb) {\\n"
+                  "    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);\\n"
+                  "  }")
+          p.write_text(s)
           # path_provider's documents directory is unavailable in browsers.
           # Keep the native Android path unchanged; web SQLite uses a database name.
           p = Path("lib/database/db_helper.dart")
@@ -60,12 +73,19 @@ jobs:
           if "package:flutter/foundation.dart" not in s:
               s = s.replace("import 'dart:io';", "import 'dart:io';\nimport 'package:flutter/foundation.dart';")
           # Adapt the original V2 database initializer for browser SQLite and native paths.
-          old = "    final dbPath = await getApplicationDocumentsDirectory();\n    final path = join(dbPath.path, filePath);\n\n    return await openDatabase(\n      path,\n      version: 1,"
-          new = "    final path = kIsWeb ? filePath : join((await getApplicationDocumentsDirectory()).path, filePath);\n\n    return await openDatabase(\n      path,\n      version: 1,"
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif "final path = kIsWeb ? filePath" not in s:
-              raise SystemExit("DB initializer patch target not found; stopping safely")
+          # Use a whitespace-tolerant match for the DB initializer in the ZIP.
+          pattern = re.compile(
+              r"(?m)^(?P<indent>\\s*)final\\s+(?P<dir>\\w+)\\s*=\\s*await\\s+getApplicationDocumentsDirectory\\(\\)\\s*;\\s*"
+              r"(?P=indent)final\\s+(?P<path>\\w+)\\s*=\\s*join\\(\\s*(?P=dir)\\.path\\s*,\\s*filePath\\s*\\)\\s*;"
+          )
+          def replace_db_path(m):
+              indent, path_var = m.group("indent"), m.group("path")
+              return f"{indent}final {path_var} = kIsWeb ? filePath : join((await getApplicationDocumentsDirectory()).path, filePath);"
+          s, count = pattern.subn(replace_db_path, s, count=1)
+          if count == 0 and "kIsWeb ? filePath" not in s:
+              print("===== UNMATCHED db_helper.dart =====")
+              print(s)
+              raise SystemExit("Could not identify DB path initializer in source archive")
           p.write_text(s)
           PY
 
