@@ -118,10 +118,23 @@ jobs:
           p = Path("android/app/build.gradle.kts")
           if p.exists():
               s = p.read_text()
-              s, n = re.subn(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', s, count=1)
-              if not n:
-                  s = s.replace('android {', 'android {\n    compileSdk = 36', 1)
-              p.write_text(s)
+              lines = s.splitlines()
+              found = False
+              for i, line in enumerate(lines):
+                  if re.match(r'^\s*compileSdk\s*=', line):
+                      indent = line[:len(line) - len(line.lstrip())]
+                      lines[i] = indent + 'compileSdk = 36'
+                      found = True
+                      break
+              if not found:
+                  for i, line in enumerate(lines):
+                      if line.strip() == 'android {':
+                          lines.insert(i + 1, '    compileSdk = 36')
+                          found = True
+                          break
+              if not found:
+                  raise SystemExit("Could not locate android block to set compileSdk")
+              p.write_text(chr(10).join(lines) + chr(10))
           else:
               p = Path("android/app/build.gradle")
               if not p.exists():
