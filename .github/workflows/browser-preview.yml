@@ -18,9 +18,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # Keep the job off the protected github-pages environment while diagnosing
+    # runner startup; deploy-pages still publishes the Pages artifact via OIDC.
     steps:
       - name: Checkout browser preview branch
         uses: actions/checkout@v4
